@@ -4,45 +4,20 @@ import './App.css';
 import SearchBar     from '../SearchBar/SearchBar';
 import SearchResults from '../SearchResults/SearchResults';
 import Playlist      from '../PlayList/PlayList';
+import Spotify       from '../../util/Spotify';
 
 class App extends Component {
     constructor(props) {
         super(props);
+        //If we kept the objects in the local storage, reload them
+        const tracks_str   = localStorage.getItem('tracks');
+        const playlistName = localStorage.getItem('playlistName');
+        const tracks = tracks_str ? JSON.parse(tracks_str) : [];
+        //set up initial states
         this.state = {
-            searchResults : [
-                {
-                    name  : "The World According to Pablo",
-                    artist: "Pablo",
-                    album : "Pablo's World",
-                    id    : 1,
-                    uri   : 'blablalbal'
-                },
-                {
-                    name  : "The World According to Elyna",
-                    artist: "Elyna",
-                    album : "Elyna's World",
-                    id    : 2,
-                    uri   : 'blablalbal'
-                },
-                {
-                    name  : "The World According to Juan",
-                    artist: "Juan",
-                    album : "Juan's World",
-                    id    : 3,
-                    uri   : 'blablalbal'
-                }
-            ],
-            playlistName  : "My playlist",
-            playlistTracks: [
-                {
-                    name  : "The World According to Pablo",
-                    artist: "Pablo",
-                    album : "Pablo's World",
-                    id    : 1,
-                    uri   : 'blablalbal'
-                }
-            ]
-
+            searchResults : [],
+            playlistName  : playlistName ? playlistName : 'New Playlist',
+            playlistTracks: tracks
         };
 
         this.addTrack           = this.addTrack.bind(this);
@@ -52,6 +27,7 @@ class App extends Component {
         this.search             = this.search.bind(this);
     }
 
+    //Add a new track to the playlist if the track doesn't exist
     addTrack(track) {
         if (this.state.playlistTracks.find(savedTrack => savedTrack.id === track.id)) {
             return;
@@ -61,14 +37,31 @@ class App extends Component {
             return {
                 playlistTracks : [...prevState.playlistTracks,track]
             };
+        }, () => {
+            localStorage.setItem('tracks',JSON.stringify(this.state.playlistTracks));
         });
+
+        //Remove the track from the result
+        this.removeTrackFromResults(track);
     }
 
+    //Remove a track from the playlist, using filtering
     removeTrack(track) {
         this.setState(prevState => {
             const newPlaylist = prevState.playlistTracks.filter(keepTrack => keepTrack.id !== track.id);
             return {
                 playlistTracks : newPlaylist
+            };
+        }, () => {
+            localStorage.setItem('tracks',JSON.stringify(this.state.playlistTracks));
+        });
+    }
+
+    removeTrackFromResults(track) {
+        this.setState(prevState => {
+            const newSearchResults = prevState.searchResults.filter(keepTrack => keepTrack.id !== track.id);
+            return {
+                searchResults : newSearchResults
             };
         });
     }
@@ -76,15 +69,45 @@ class App extends Component {
     updatePlaylistName(newPlaylistName) {
         this.setState({
             playlistName : newPlaylistName
+        }, () =>{
+            localStorage.setItem('playlistName',this.state.playlistName);
         });
+
     }
 
     savePlaylist() {
-        const trackURIs = this.state.playlistTracks.map(track => track.uri);
+        const playlistUris = this.state.playlistTracks.map(track => track.uri);
+        //Call spotify save list with the list of uris from the playlist
+        Spotify.savePlaylist(this.state.playlistName,playlistUris)
+        .then (ok => {
+            if (ok) {
+                this.setState({
+                    playlistName   : 'New Playlist',
+                    playlistTracks : []
+                });
+                localStorage.setItem('playlistName','');
+                localStorage.setItem('track','');
+            } else {
+                //We were redirected so we didnt save it to spotify
+                alert('Try again');
+            }
+        });
+    }
+
+    //Perform an intersect with the playlist
+    intersectPlaylist(searchResults) {
+        const idsPlaylist      = this.state.playlistTracks.map(track => track.id);
+        const newSearchResults = searchResults.filter(track => !idsPlaylist.includes(track.id));
+        return newSearchResults;
     }
 
     search(searchTerm) {
-        console.log(searchTerm);
+      Spotify.search(searchTerm)
+        .then(searchResults => {
+            this.setState({
+                searchResults : this.intersectPlaylist(searchResults)
+            });
+        });
     }
 
     render() {
