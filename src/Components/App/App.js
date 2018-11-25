@@ -86,7 +86,7 @@ class App extends Component {
                     playlistTracks : []
                 });
                 localStorage.setItem('playlistName','');
-                localStorage.setItem('track','');
+                localStorage.setItem('tracks','');
             } else {
                 //We were redirected so we didnt save it to spotify
                 alert('Try again');
@@ -94,8 +94,8 @@ class App extends Component {
         });
     }
 
-    //Perform an intersect with the playlist
-    intersectPlaylist(searchResults) {
+    //Perform a difference with the playlist
+    differencePlaylist(searchResults) {
         const idsPlaylist      = this.state.playlistTracks.map(track => track.id);
         const newSearchResults = searchResults.filter(track => !idsPlaylist.includes(track.id));
         return newSearchResults;
@@ -105,7 +105,7 @@ class App extends Component {
       Spotify.search(searchTerm)
         .then(searchResults => {
             this.setState({
-                searchResults : this.intersectPlaylist(searchResults)
+                searchResults : this.differencePlaylist(searchResults)
             });
         });
     }
